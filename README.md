@@ -1,4 +1,4 @@
-# Simulador de Cache — Documentação
+# CacheSim
 
 ## Visão Geral
 
@@ -12,15 +12,10 @@ com políticas de substituição **Random**, **FIFO** e **LRU**.
 
 ```
 CacheSim/
-├── include/
-│   └── cache.h              # Estruturas, enums e declaração da classe
-├── src/
-│   ├── main.cpp             # Ponto de entrada e parsing de argumentos
-│   └── cache.cpp            # Implementação do simulador
-├── tests/                   # Arquivos binários de teste (gerados)
-├── docs/
-│   └── README.md            # Esta documentação
-├── Makefile                 # Compilação
+└── cache.h              # Estruturas, enums e declaração da classe
+└── cache.cpp            # Implementação do simulador
+└── README.md            # Esta documentação
+└── Makefile                 # Compilação
 ```
 
 ---
