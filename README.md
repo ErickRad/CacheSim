@@ -1,4 +1,4 @@
-# Simulador de Cache — Documentação
+# CacheSim
 
 ## Visão Geral
 
