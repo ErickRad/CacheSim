@@ -111,21 +111,21 @@ void CacheSimulator::run(){
     uint32_t raw_address = 0;
 
     while (fin.read(reinterpret_cast<char*>(&raw_address), sizeof(raw_address))) {
+        uint32_t tag = 0, index = 0;
         
-        
-        uint32_t address = ((raw_address & 0xFF000000u) >> 24) |
+       uint32_t address = ((raw_address & 0xFF000000u) >> 24) |
                            ((raw_address & 0x00FF0000u) >>  8) |
                            ((raw_address & 0x0000FF00u) <<  8) |
                            ((raw_address & 0x000000FFu) << 24);
 
-
         global_counter_++;
         stats_.total_accesses++;
 
-        uint32_t tag = 0, index = 0;
-       
         decodeAddress(address, tag, index);
         uint64_t block_id = static_cast<uint64_t>(address) >> offset_bits_;
+        
+       
+        
         
         auto& real_set = sets_[index];
 
@@ -141,7 +141,7 @@ void CacheSimulator::run(){
             }
         }
 
-        bool first_access = (seen_blocks.find(block_id) == seen_blocks.end());
+        //bool first_access = (seen_blocks.find(block_id) == seen_blocks.end());
         
         seen_blocks.insert(block_id);
 
@@ -166,24 +166,26 @@ void CacheSimulator::run(){
 
         stats_.misses++;
 
-        if (first_access) {
-            stats_.compulsory_misses++;
-
-        } else if (!fa_hit) {
-            stats_.capacity_misses++;
-
-        } else {
-            stats_.conflict_misses++;
-        }
+        
 
         int target_way = -1;
-
+        bool compulsory = false;
         for (int w = 0; w < config_.assoc; w++) {
 
             if (!real_set[w].valid) {
+                compulsory = true;
                 target_way = w;
                 break;
             }
+        }
+        if(compulsory){
+            stats_.compulsory_misses++;
+        }
+        else if (lru_map.find(block_id) != lru_map.end()) {
+            stats_.capacity_misses++;
+        } 
+        else {
+           stats_.conflict_misses++;
         }
 
         if (target_way == -1) target_way = selectVictim(index);
@@ -193,7 +195,6 @@ void CacheSimulator::run(){
         real_set[target_way].fifo_count = global_counter_;
         real_set[target_way].lru_count  = global_counter_;
     }
-
     fin.close();
 }
 
