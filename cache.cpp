@@ -143,11 +143,10 @@ void CacheSimulator::access(uint32_t address)
 
         if (!set[w].valid) {
             target_way = w;
+            selectVictim(index);
             break;
         }
     }
-
-    target_way = (target_way == -1) ? selectVictim(index) : target_way;
     
     set[target_way].valid      = true;
     set[target_way].tag        = tag;

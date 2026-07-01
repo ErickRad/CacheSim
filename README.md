@@ -71,19 +71,19 @@ make clean
 
 ### Exemplo do enunciado (resultado esperado)
 ```bash
-./cache_simulator 256 4 1 R 1 tests/bin_100.bin
+./simulate 256 4 1 R 1 bin_100.bin
 # Saída esperada (com bin_100.bin oficial):
 # 100 0.9200 0.0800 1.0000 0.0000 0.0000
 ```
 
 ### Cache 4-way com LRU, saída numérica
 ```bash
-./cache_simulator 64 16 4 L 1 tests/bin_1000.bin
+./simulate 64 16 4 L 1 bin_1000.bin
 ```
 
 ### Cache totalmente associativa, saída verbose
 ```bash
-./cache_simulator 1 32 8 F 0 tests/bin_1000.bin
+./simulate 1 32 8 F 0 bin_1000.bin
 ```
 
 ---
@@ -136,11 +136,6 @@ Formato binário, endereços de **32 bits** em **big-endian**, sem cabeçalho.
 
 Cada endereço ocupa exatamente 4 bytes. O arquivo com N endereços tem `N × 4` bytes.
 
-Para gerar arquivos de teste:
-```bash
-python3 generate_test_bins.py
-```
-
 ---
 
 ## Detalhes da Implementação
@@ -181,9 +176,6 @@ Os endereços no arquivo são lidos em **big-endian** e convertidos para a ordem
 ```bash
 # Compilar
 make
-
-# Gerar arquivos de teste
-python3 generate_test_bins.py
 
 # Rodar todos os testes
 make test
