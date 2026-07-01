@@ -15,7 +15,7 @@ CacheSim/
 └── cache.h              # Estruturas, enums e declaração da classe
 └── cache.cpp            # Implementação do simulador
 └── README.md            # Esta documentação
-└── Makefile                 # Compilação
+└── Makefile             # Compilação
 ```
 
 ---
@@ -71,19 +71,18 @@ make clean
 
 ### Exemplo do enunciado (resultado esperado)
 ```bash
-./simulate 256 4 1 R 1 bin_100.bin
-# Saída esperada (com bin_100.bin oficial):
+./simulate 256 4 1 R 1 tests/bin_100.bin
 # 100 0.9200 0.0800 1.0000 0.0000 0.0000
 ```
 
 ### Cache 4-way com LRU, saída numérica
 ```bash
-./simulate 64 16 4 L 1 bin_1000.bin
+./simulate 64 16 4 L 1 tests/bin_1000.bin
 ```
 
 ### Cache totalmente associativa, saída verbose
 ```bash
-./simulate 1 32 8 F 0 bin_1000.bin
+./simulate 1 32 8 F 0 tests/bin_1000.bin
 ```
 
 ---
@@ -171,20 +170,7 @@ Os endereços no arquivo são lidos em **big-endian** e convertidos para a ordem
 
 ---
 
-## Compilação e Testes Rápidos
-
-```bash
-# Compilar
-make
-
-# Rodar todos os testes
-make test
-```
-
----
-
 ## Requisitos do Sistema
 
 - Sistema operacional: Linux / macOS / Windows (WSL)
 - Compilador: `g++ ≥ 7` com suporte a `-std=c++17`
-- Python 3.x (apenas para geração de arquivos de teste)

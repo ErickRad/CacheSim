@@ -86,12 +86,6 @@ private:
     int tag_bits_;
 
     /**
-     * @brief Acessa um endereço na cache (simula um acesso de leitura)
-     * @param address Endereço de 32 bits
-     */
-    void access(uint32_t address);
-
-    /**
      * @brief Decompõe um endereço nos campos: tag, índice e offset
      */
     void decodeAddress(uint32_t address, uint32_t& tag,
