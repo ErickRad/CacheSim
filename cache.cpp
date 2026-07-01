@@ -19,7 +19,7 @@
  *                  cache real mas não ocorreria na FA ideal).
  */
 
-#include "cache.h"
+#include "cache.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -29,6 +29,7 @@
 #include <set>
 #include <stdexcept>
 #include <unordered_set>
+#include <iomanip>
 
 CacheSimulator::CacheSimulator(const CacheConfig& config) : config_(config), global_counter_(0){
 
@@ -49,26 +50,26 @@ CacheSimulator::CacheSimulator(const CacheConfig& config) : config_(config), glo
         throw std::invalid_argument("Configuração inválida: tag_bits negativo");
 
     sets_.assign(config_.nsets, std::vector<CacheLine>(config_.assoc));
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
+
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 }
 
 int CacheSimulator::log2i(int value){
     int bits = 0;
+
     while (value > 1) {
         value >>= 1;
-        ++bits;
+        bits++;
     }
+
     return bits;
 }
 
-void CacheSimulator::decodeAddress(uint32_t address, uint32_t& tag, uint32_t& index, uint32_t& /*offset*/) const {
-    uint32_t offset_mask = (1u << offset_bits_) - 1u;
+void CacheSimulator::decodeAddress(uint32_t address, uint32_t& tag, uint32_t& index) const {
     uint32_t index_mask  = (1u << index_bits_)  - 1u;
 
     index = (address >> offset_bits_) & index_mask;
     tag   = address >> (offset_bits_ + index_bits_);
-
-    (void) offset_mask; // supostamente silencia warnings, embora offset não seja usado diretamente
 }
 
 int CacheSimulator::selectVictim(int set_index){
@@ -76,39 +77,39 @@ int CacheSimulator::selectVictim(int set_index){
 
     switch (config_.policy) {
 
-    case ReplacementPolicy::RANDOM: {
-        return std::rand() % config_.assoc;
-    }
-
-    case ReplacementPolicy::FIFO: {
-        int    oldest_way   = 0;
-        uint64_t oldest_val = set[0].fifo_order;
-
-        for (int w = 1; w < config_.assoc; ++w) {
-
-            if (set[w].fifo_order < oldest_val) {
-                oldest_val = set[w].fifo_order;
-                oldest_way = w;
-            }
-        }
-        return oldest_way;
-    }
-
-    case ReplacementPolicy::LRU: {
-        int    lru_way = 0;
-        uint64_t lru_val = set[0].lru_order;
-
-        for (int w = 1; w < config_.assoc; ++w) {
-
-            if (set[w].lru_order < lru_val) {
-                lru_val = set[w].lru_order;
-                lru_way = w;
-            }
+        case ReplacementPolicy::RANDOM: {
+            return std::rand() % config_.assoc;
         }
 
-        return lru_way;
-    }
+        case ReplacementPolicy::FIFO: {
+            int oldest_way = 0;
+            uint64_t oldest_val = set[0].fifo_count;
 
+            for (int w = 1; w < config_.assoc; w++) {
+
+                if (set[w].fifo_count < oldest_val) {
+                    oldest_val = set[w].fifo_count;
+                    oldest_way = w;
+                }
+            }
+            
+            return oldest_way;
+        }
+
+        case ReplacementPolicy::LRU: {
+            int lru_way = 0;
+            uint64_t lru_val = set[0].lru_count;
+
+            for (int w = 1; w < config_.assoc; w++) {
+
+                if (set[w].lru_count < lru_val) {
+                    lru_val = set[w].lru_count;
+                    lru_way = w;
+                }
+            }
+
+            return lru_way;
+        }
     }
 
     return 0; // fallback (não deve ocorrer)
@@ -116,42 +117,42 @@ int CacheSimulator::selectVictim(int set_index){
 
 void CacheSimulator::access(uint32_t address)
 {
-    ++stats_.total_accesses;
-    ++global_counter_;
+    stats_.total_accesses++;
+    global_counter_++;
 
-    uint32_t tag = 0, index = 0, offset = 0;
-    decodeAddress(address, tag, index, offset);
+    uint32_t tag = 0, index = 0;
+    decodeAddress(address, tag, index);
 
     auto& set = sets_[index];
 
-    for (int w = 0; w < config_.assoc; ++w) {
+    for (int w = 0; w < config_.assoc; w++) {
+
         if (set[w].valid && set[w].tag == tag) {
-            ++stats_.hits;
-            set[w].lru_order = global_counter_; // atualiza LRU
+            stats_.hits++;
+            set[w].lru_count = global_counter_;
+
             return;
         }
     }
 
-    ++stats_.misses;
+    stats_.misses++;
 
     int target_way = -1;
 
-    for (int w = 0; w < config_.assoc; ++w) {
+    for (int w = 0; w < config_.assoc; w++) {
+
         if (!set[w].valid) {
             target_way = w;
             break;
         }
     }
 
-    bool eviction_needed = (target_way == -1);
-    if (eviction_needed) {
-        target_way = selectVictim(index);
-    }
-
+    target_way = (target_way == -1) ? selectVictim(index) : target_way;
+    
     set[target_way].valid      = true;
     set[target_way].tag        = tag;
-    set[target_way].fifo_order = global_counter_;
-    set[target_way].lru_order  = global_counter_;
+    set[target_way].fifo_count = global_counter_;
+    set[target_way].lru_count  = global_counter_;
 }
 
 void CacheSimulator::run(){
@@ -162,6 +163,7 @@ void CacheSimulator::run(){
         throw std::runtime_error("Não foi possível abrir: " + config_.input_file);
 
     int fa_ways = config_.nsets * config_.assoc; // capacidade em blocos
+
     std::vector<CacheLine> fa_cache(fa_ways);     // 1 conjunto com fa_ways vias
     uint64_t fa_counter = 0;
     std::unordered_set<uint32_t> seen_blocks;
@@ -175,60 +177,60 @@ void CacheSimulator::run(){
                            ((raw_address & 0x0000FF00u) <<  8) |
                            ((raw_address & 0x000000FFu) << 24);
 
-        ++global_counter_;
-        ++stats_.total_accesses;
+        global_counter_++;
+        stats_.total_accesses++;
 
         uint32_t block_id = address >> offset_bits_; // remove offset
-        uint32_t tag = 0, index = 0, offset_dummy = 0;
+        uint32_t tag = 0, index = 0;
 
-        decodeAddress(address, tag, index, offset_dummy);
+        decodeAddress(address, tag, index);
         auto& real_set = sets_[index];
 
         bool real_hit = false;
 
-        for (int w = 0; w < config_.assoc; ++w) {
+        for (int w = 0; w < config_.assoc; w++) {
 
             if (real_set[w].valid && real_set[w].tag == tag) {
                 real_hit = true;
-                real_set[w].lru_order = global_counter_;
+                real_set[w].lru_count = global_counter_;
 
                 break;
             }
         }
 
         if (real_hit) {
-            ++stats_.hits;
+            stats_.hits++;
             seen_blocks.insert(block_id);
 
             continue;
         }
 
-        ++stats_.misses;
-        ++fa_counter;
+        stats_.misses++;
+        fa_counter++;
 
         bool fa_hit = false;
 
 
-        for (int w = 0; w < fa_ways; ++w) {
+        for (int w = 0; w < fa_ways; w++) {
 
             if (fa_cache[w].valid && fa_cache[w].tag == block_id) {
                 fa_hit = true;
-                fa_cache[w].lru_order = fa_counter;
+                fa_cache[w].lru_count = fa_counter;
 
                 break;
             }
         }
 
-        bool first_time = (seen_blocks.find(block_id) == seen_blocks.end());
+        bool fifo_count_time = (seen_blocks.find(block_id) == seen_blocks.end());
 
-        if (first_time) {
-            ++stats_.compulsory_misses;
+        if (fifo_count_time) {
+            stats_.compulsory_misses++;
 
         } else if (!fa_hit) {
-            ++stats_.capacity_misses;
+            stats_.capacity_misses++;
 
         } else {
-            ++stats_.conflict_misses;
+            stats_.conflict_misses++;
 
         }
 
@@ -236,42 +238,42 @@ void CacheSimulator::run(){
 
         int target_way = -1;
 
-        for (int w = 0; w < config_.assoc; ++w) {
+        for (int w = 0; w < config_.assoc; w++) {
 
             if (!real_set[w].valid) { target_way = w; break; }
         }
 
         if (target_way == -1) target_way = selectVictim(index);
 
-        real_set[target_way].valid      = true;
-        real_set[target_way].tag        = tag;
-        real_set[target_way].fifo_order = global_counter_;
-        real_set[target_way].lru_order  = global_counter_;
+        real_set[target_way].valid  = true;
+        real_set[target_way].tag    = tag;
+        real_set[target_way].fifo_count  = global_counter_;
+        real_set[target_way].lru_count   = global_counter_;
 
         if (!fa_hit) {
             int fa_target = -1;
 
-            for (int w = 0; w < fa_ways; ++w) {
+            for (int w = 0; w < fa_ways; w++) {
                 if (!fa_cache[w].valid) { fa_target = w; break; }
             }
 
             if (fa_target == -1) {
                 
                 fa_target = 0;
-                uint64_t oldest = fa_cache[0].lru_order;
+                uint64_t oldest = fa_cache[0].lru_count;
 
-                for (int w = 1; w < fa_ways; ++w) {
-                    if (fa_cache[w].lru_order < oldest) {
+                for (int w = 1; w < fa_ways; w++) {
+                    if (fa_cache[w].lru_count < oldest) {
 
-                        oldest   = fa_cache[w].lru_order;
+                        oldest   = fa_cache[w].lru_count;
                         fa_target = w;
                     }
                 }
             }
-            fa_cache[fa_target].valid      = true;
-            fa_cache[fa_target].tag        = block_id;
-            fa_cache[fa_target].fifo_order = fa_counter;
-            fa_cache[fa_target].lru_order  = fa_counter;
+            fa_cache[fa_target].valid  = true;
+            fa_cache[fa_target].tag    = block_id;
+            fa_cache[fa_target].fifo_count  = fa_counter;
+            fa_cache[fa_target].lru_count   = fa_counter;
         }
     }
 
@@ -281,19 +283,21 @@ void CacheSimulator::run(){
 void CacheSimulator::printStats() const{
     const auto& s = stats_;
 
-    double hit_rate        = (s.total_accesses > 0)
-                             ? static_cast<double>(s.hits) / s.total_accesses : 0.0;
+    double hit_rate = (s.total_accesses > 0)
+        ? static_cast<double>(s.hits) / s.total_accesses : 0.0;
 
-    double miss_rate       = 1.0 - hit_rate;
+    double miss_rate = 1.0 - hit_rate;
 
-    double comp_rate       = (s.misses > 0)
-                             ? static_cast<double>(s.compulsory_misses) / s.misses : 0.0;
-    double cap_rate        = (s.misses > 0)
-                             ? static_cast<double>(s.capacity_misses)  / s.misses : 0.0;
-    double conf_rate       = (s.misses > 0)
-                             ? static_cast<double>(s.conflict_misses)  / s.misses : 0.0;
+    double comp_rate = (s.misses > 0)
+        ? static_cast<double>(s.compulsory_misses) / s.misses : 0.0;
 
-    if (config_.flag_output == 0) {
+    double cap_rate = (s.misses > 0)
+        ? static_cast<double>(s.capacity_misses)  / s.misses : 0.0;
+
+    double conf_rate = (s.misses > 0)
+        ? static_cast<double>(s.conflict_misses)  / s.misses : 0.0;
+
+    if (config_.flag == 0) {
         std::cout << "==============================\n";
         std::cout << " RELATÓRIO DO SIMULADOR DE CACHE\n";
         std::cout << "==============================\n";
@@ -326,9 +330,9 @@ void CacheSimulator::printStats() const{
         std::cout << "Taxas:\n";
         std::cout << "  Taxa de hit         : " << hit_rate  * 100.0 << " %\n";
         std::cout << "  Taxa de miss        : " << miss_rate * 100.0 << " %\n";
-        std::cout << "  Taxa miss compuls.  : " << comp_rate * 100.0 << " %\n";
-        std::cout << "  Taxa miss capac.    : " << cap_rate  * 100.0 << " %\n";
-        std::cout << "  Taxa miss conflito  : " << conf_rate * 100.0 << " %\n";
+        std::cout << std::fixed << std::setprecision(2)  << "  Taxa miss compuls.  : " << comp_rate * 100.0 << " %\n";
+        std::cout << std::fixed << std::setprecision(2)  << "  Taxa miss capac.    : " << cap_rate  * 100.0 << " %\n";
+        std::cout << std::fixed << std::setprecision(2)  << "  Taxa miss conflito  : " << conf_rate * 100.0 << " %\n";
 
         std::cout << "==============================\n";
 

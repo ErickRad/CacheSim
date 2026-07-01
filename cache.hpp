@@ -2,7 +2,7 @@
 #define CACHE_H
 
 /**
- * @file cache.h
+ * @file cache.hpp
  * @brief Definições e estruturas do simulador de cache
  *
  * Este arquivo contém todas as estruturas de dados e declarações
@@ -21,58 +21,43 @@
 #include <vector>
 #include <string>
 
-// ─────────────────────────────────────────────
-// Política de substituição
-// ─────────────────────────────────────────────
 enum class ReplacementPolicy {
     RANDOM,
     FIFO,
     LRU
 };
 
-// ─────────────────────────────────────────────
-// Uma linha (bloco) dentro de um conjunto
-// ─────────────────────────────────────────────
 struct CacheLine {
     bool      valid;      ///< Indica se o bloco é válido
     uint32_t  tag;        ///< Tag do bloco armazenado
-    uint64_t  fifo_order; ///< Contador de inserção (para FIFO)
-    uint64_t  lru_order;  ///< Contador de último uso (para LRU)
+    uint64_t  fifo_count; ///< Contador de inserção (para FIFO)
+    uint64_t  lru_count;  ///< Contador de último uso (para LRU)
 
-    CacheLine() : valid(false), tag(0), fifo_order(0), lru_order(0) {}
+    CacheLine() : valid(false), tag(0), fifo_count(0), lru_count(0) {}
 };
 
-// ─────────────────────────────────────────────
-// Estatísticas de simulação
-// ─────────────────────────────────────────────
 struct CacheStats {
-    uint64_t total_accesses   = 0; ///< Total de acessos
-    uint64_t hits             = 0; ///< Acertos
-    uint64_t misses           = 0; ///< Total de misses
+    uint64_t total_accesses    = 0;  ///< Total de acessos
+    uint64_t hits              = 0;  ///< Acertos
+    uint64_t misses            = 0;  ///< Total de misses
     uint64_t compulsory_misses = 0; ///< Misses compulsórios (cold miss)
-    uint64_t capacity_misses  = 0; ///< Misses de capacidade
-    uint64_t conflict_misses  = 0; ///< Misses de conflito
+    uint64_t capacity_misses   = 0;  ///< Misses de capacidade
+    uint64_t conflict_misses   = 0;  ///< Misses de conflito
 };
 
-// ─────────────────────────────────────────────
-// Configuração da cache
-// ─────────────────────────────────────────────
 struct CacheConfig {
     int               nsets;        ///< Número de conjuntos
     int               bsize;        ///< Tamanho do bloco em bytes
     int               assoc;        ///< Grau de associatividade
     ReplacementPolicy policy;       ///< Política de substituição
-    int               flag_output;  ///< 0 = verbose, 1 = padrão
+    int               flag;         ///< 0 = verbose, 1 = padrão
     std::string       input_file;   ///< Arquivo de entrada binário
 };
 
-// ─────────────────────────────────────────────
-// Classe principal do simulador de cache
-// ─────────────────────────────────────────────
 class CacheSimulator {
 public:
     /**
-     * @brief Construtor — inicializa a cache com a configuração fornecida
+     * @brief Construtor - inicializa a cache com a configuração fornecida
      * @param config Estrutura com todos os parâmetros da cache
      */
     explicit CacheSimulator(const CacheConfig& config);
@@ -110,7 +95,7 @@ private:
      * @brief Decompõe um endereço nos campos: tag, índice e offset
      */
     void decodeAddress(uint32_t address, uint32_t& tag,
-                       uint32_t& index, uint32_t& offset) const;
+                       uint32_t& index) const;
 
     /**
      * @brief Seleciona a via a ser substituída dentro de um conjunto
